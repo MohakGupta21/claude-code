@@ -38,21 +38,19 @@ export function createApiHandler({ service, rooms }: ApiDeps) {
 
       if (path === '/api/games' && req.method === 'POST') {
         const body = await readJson(req);
-        return json(res, 201, service.createGame(parsePlayerName(body.name)));
+        return json(res, 201, await service.createGame(parsePlayerName(body.name)));
       }
 
       const join = JOIN_ROUTE.exec(path);
       if (join && req.method === 'POST') {
         const roomCode = parseRoomCode(decodeURIComponent(join[1]));
         const body = await readJson(req);
-        const { session, events } = service.joinGame(roomCode, parsePlayerName(body.name));
-        rooms.broadcastState(roomCode, { state: session.state, events });
-        return json(res, 201, session);
+        return json(res, 201, await rooms.join(roomCode, parsePlayerName(body.name)));
       }
 
       const room = ROOM_ROUTE.exec(path);
       if (room && req.method === 'GET') {
-        return json(res, 200, { state: service.getState(parseRoomCode(decodeURIComponent(room[1]))) });
+        return json(res, 200, { state: await service.getState(parseRoomCode(decodeURIComponent(room[1]))) });
       }
 
       return json(res, 404, errorBody(ERROR_CODES.INVALID_INPUT, 'Not found.'));

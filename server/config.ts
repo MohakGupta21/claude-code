@@ -5,10 +5,18 @@ function intFromEnv(name: string, fallback: number): number {
   return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
+function requireEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} is not set. See README.md for configuration.`);
+  return value;
+}
+
 export interface ServerConfig {
   port: number;
   host: string;
-  dbPath: string;
+  /** PostgreSQL connection string, e.g. postgres://user:pass@host:5432/db?sslmode=require */
+  databaseUrl: string;
+  databasePoolMax: number;
   clientDir: string;
   /** How long a disconnected player keeps their lobby seat / turn before being removed / skipped. */
   reconnectGraceMs: number;
@@ -21,7 +29,8 @@ export function loadConfig(): ServerConfig {
   return {
     port: intFromEnv('PORT', 3000),
     host: process.env.HOST ?? '0.0.0.0',
-    dbPath: resolve(process.env.DB_PATH ?? 'data/snakes.db'),
+    databaseUrl: requireEnv('DATABASE_URL'),
+    databasePoolMax: intFromEnv('DATABASE_POOL_MAX', 10),
     clientDir: resolve('dist/client'),
     reconnectGraceMs: intFromEnv('RECONNECT_GRACE_MS', 30_000),
     startCountdownMs: intFromEnv('START_COUNTDOWN_MS', 3_000),

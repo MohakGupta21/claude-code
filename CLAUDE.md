@@ -2,7 +2,7 @@
 
 ## Project: Multiplayer Snake & Ladders
 
-Build a polished, production-quality **multiplayer Snake & Ladders web application** with an attractive modern UI, real-time multiplayer gameplay, and SQLite persistence.
+Build a polished, production-quality **multiplayer Snake & Ladders web application** with an attractive modern UI, real-time multiplayer gameplay, and PostgreSQL persistence.
 
 The application should feel like a real multiplayer game rather than a basic CRUD/demo application.
 
@@ -177,9 +177,11 @@ Clients must not be able to arbitrarily modify:
 
 ---
 
-# 6. SQLite Database
+# 6. PostgreSQL Database
 
-Use **SQLite** as the persistent database.
+Use **PostgreSQL** as the persistent database.
+
+The server connects using the `DATABASE_URL` environment variable (a standard Postgres connection string). Never hardcode connection strings or credentials in source code.
 
 The database should store at minimum:
 
@@ -243,7 +245,7 @@ When a player reconnects:
 
 Do not rely exclusively on in-memory state.
 
-SQLite should be the durable source of game state.
+PostgreSQL should be the durable source of game state.
 
 ---
 
@@ -290,7 +292,7 @@ Game Server
    ↓
 Game Engine
    ↓
-SQLite
+PostgreSQL
    ↓
 Broadcast updated state
    ↓
@@ -671,7 +673,7 @@ Do not create unnecessary endpoints when WebSockets are more appropriate.
 
 Use migrations.
 
-Do not manually modify the SQLite database schema during development without updating the migration/schema definition.
+Do not manually modify the PostgreSQL database schema during development without updating the migration/schema definition.
 
 Add indexes for frequently queried fields such as:
 
@@ -693,6 +695,8 @@ For example, a dice roll should atomically:
 5. Update player position.
 6. Insert move history.
 7. Update game state.
+
+Postgres allows concurrent transactions, so a transaction that changes a game must first lock that game's row (`SELECT … FOR UPDATE`) before reading the state it validates against. Otherwise two simultaneous actions (e.g. two joins, or a double-clicked roll) can both pass validation.
 
 ---
 
@@ -933,7 +937,7 @@ Do not implement these unless requested, but avoid architecture that makes them 
 
 Never trust the browser for game-critical state.
 
-### Rule 2 — SQLite is persistent state
+### Rule 2 — PostgreSQL is persistent state
 
 Do not use an in-memory object as the only source of truth.
 
@@ -964,7 +968,7 @@ Avoid tightly coupling the board, dice, players, and networking logic.
 The implementation is considered complete when:
 
 * [ ] Application starts successfully.
-* [ ] SQLite database initializes correctly.
+* [ ] PostgreSQL database initializes correctly (migrations run on startup).
 * [ ] Users can create rooms.
 * [ ] Users can join rooms using a room code.
 * [ ] 2–4 players can participate.
@@ -978,7 +982,7 @@ The implementation is considered complete when:
 * [ ] Ladders work.
 * [ ] Turn management works.
 * [ ] Winner detection works.
-* [ ] Game state persists in SQLite.
+* [ ] Game state persists in PostgreSQL.
 * [ ] Move history is stored.
 * [ ] WebSocket synchronization works.
 * [ ] Players see other players' moves in real time.

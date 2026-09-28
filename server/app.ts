@@ -18,17 +18,17 @@ export interface App {
 }
 
 /** Wires the database, services, HTTP API, static client and WebSocket server together. */
-export function createApp(config: ServerConfig): App {
-  const db = openDatabase(config.dbPath);
-  const repo = new GameRepository(db);
-  repo.markAllDisconnected();
+export async function createApp(config: ServerConfig): Promise<App> {
+  const db = await openDatabase({ connectionString: config.databaseUrl, maxConnections: config.databasePoolMax });
+  const repo = GameRepository.forPool(db);
+  await repo.markAllDisconnected();
 
   const registry = new ConnectionRegistry();
   const service = new GameService(repo, { startCountdownMs: config.startCountdownMs });
   const rooms = new RoomManager(service, (roomCode, message) => registry.broadcast(roomCode, message), {
     reconnectGraceMs: config.reconnectGraceMs,
   });
-  rooms.resume();
+  await rooms.resume();
 
   const handleApi = createApiHandler({ service, rooms });
   const serveStatic = createStaticHandler(config.clientDir);
@@ -51,15 +51,13 @@ export function createApp(config: ServerConfig): App {
     server,
     db,
     service,
-    close: () =>
-      new Promise<void>((resolve) => {
-        sockets.close();
-        rooms.shutdown();
-        server.close(() => {
-          db.close();
-          resolve();
-        });
-        server.closeAllConnections();
-      }),
+    async close() {
+      sockets.close();
+      const closed = new Promise<void>((resolve) => server.close(() => resolve()));
+      server.closeAllConnections();
+      await closed;
+      await rooms.shutdown();
+      await db.end();
+    },
   };
 }

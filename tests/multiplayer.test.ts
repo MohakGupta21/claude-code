@@ -9,8 +9,10 @@ import type { ServerMessage, SessionResponse } from '../shared/protocol';
 import type { GameState } from '../shared/types';
 import { createApp, type App } from '../server/app';
 import type { ServerConfig } from '../server/config';
+import { createTestDatabase, type TestDatabase } from './testDatabase';
 
 let dir: string;
+let testDb: TestDatabase;
 let app: App;
 let baseUrl: string;
 const clients: Client[] = [];
@@ -19,7 +21,8 @@ function config(overrides: Partial<ServerConfig> = {}): ServerConfig {
   return {
     port: 0,
     host: '127.0.0.1',
-    dbPath: join(dir, 'mp.db'),
+    databaseUrl: testDb.url,
+    databasePoolMax: 5,
     clientDir: join(dir, 'client'),
     reconnectGraceMs: 200,
     startCountdownMs: 50,
@@ -29,19 +32,21 @@ function config(overrides: Partial<ServerConfig> = {}): ServerConfig {
 }
 
 async function start(overrides: Partial<ServerConfig> = {}) {
-  app = createApp(config(overrides));
+  app = await createApp(config(overrides));
   await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
 }
 
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'snl-mp-'));
+  testDb = await createTestDatabase();
   await start();
 });
 
 afterEach(async () => {
   for (const c of clients.splice(0)) c.ws.close();
   await app.close();
+  await testDb.drop();
   rmSync(dir, { recursive: true, force: true });
 });
 

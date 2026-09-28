@@ -20,6 +20,8 @@ interface Connection {
   playerId: string | null;
   alive: boolean;
   id: number;
+  /** Messages from one socket are handled strictly in order, e.g. `join` before `roll_dice`. */
+  queue: Promise<void>;
 }
 
 export interface SocketServerDeps {
@@ -49,7 +51,10 @@ export function attachSocketServer({ server, service, rooms, registry, heartbeat
   });
 
   function onConnection(ws: WebSocket, roomCode: string): void {
-    const conn: Connection = { roomCode, playerId: null, alive: true, id: nextId++ };
+    const conn: Connection = { roomCode, playerId: null, alive: true, id: nextId++, queue: Promise.resolve() };
+    const enqueue = (task: () => Promise<void>) => {
+      conn.queue = conn.queue.then(task);
+    };
     connections.set(ws, conn);
     const authTimer = setTimeout(() => {
       if (!conn.playerId) ws.close(1008, 'Authentication timeout');
@@ -59,42 +64,40 @@ export function attachSocketServer({ server, service, rooms, registry, heartbeat
     ws.on('message', (data, isBinary) => {
       if (isBinary) return reportError(ws, Errors.invalidInput('Malformed message.'));
       if (!limiter.allow(String(conn.id))) return reportError(ws, Errors.rateLimited());
-      try {
-        handleMessage(ws, conn, data.toString());
-      } catch (error) {
-        reportError(ws, error);
-      }
+      const raw = data.toString();
+      enqueue(() => handleMessage(ws, conn, raw).catch((error) => reportError(ws, error)));
     });
     ws.on('close', () => {
       clearTimeout(authTimer);
       connections.delete(ws);
-      if (conn.playerId && registry.unregister(conn.roomCode, conn.playerId, ws)) {
+      enqueue(async () => {
+        if (!conn.playerId || !registry.unregister(conn.roomCode, conn.playerId, ws)) return;
         try {
-          rooms.disconnect(conn.roomCode, conn.playerId);
+          await rooms.disconnect(conn.roomCode, conn.playerId);
         } catch (error) {
           if (!(error instanceof GameError)) logger.error('Failed to handle disconnect', error);
         }
-      }
+      });
     });
     ws.on('error', (error) => logger.warn('WebSocket error', error.message));
   }
 
-  function handleMessage(ws: WebSocket, conn: Connection, raw: string): void {
+  async function handleMessage(ws: WebSocket, conn: Connection, raw: string): Promise<void> {
     const message = parseClientMessage(raw);
 
     if (message.type === 'join' || message.type === 'reconnect') {
-      service.authenticate(conn.roomCode, message.playerId, message.token);
+      await service.authenticate(conn.roomCode, message.playerId, message.token);
       if (conn.playerId && conn.playerId !== message.playerId) throw Errors.invalidPlayer();
       conn.playerId = message.playerId;
       registry.register(conn.roomCode, message.playerId, ws);
-      const state = rooms.connect(conn.roomCode, message.playerId);
+      const state = await rooms.connect(conn.roomCode, message.playerId);
       send(ws, { type: 'welcome', playerId: message.playerId, state });
       return;
     }
 
     if (!conn.playerId) throw Errors.notAuthenticated();
     const playerId = conn.playerId;
-    rooms.handleAction(conn.roomCode, playerId, message);
+    await rooms.handleAction(conn.roomCode, playerId, message);
 
     if (message.type === 'leave') {
       registry.unregister(conn.roomCode, playerId, ws);

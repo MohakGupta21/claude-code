@@ -3,15 +3,16 @@
 Real-time multiplayer Snakes & Ladders for 2–4 players. Create a room, share the code, and race to square 100.
 
 - **Server-authoritative**: the browser only sends intents (`roll_dice`, `start`, …). Dice, movement, snakes, ladders, turns and wins are all decided on the server.
-- **Durable**: SQLite is the source of truth. Games, players and full move history survive server restarts.
+- **Durable**: PostgreSQL is the source of truth. Games, players and full move history survive server restarts.
 - **Real-time**: every player in a room gets state updates over WebSockets, with automatic reconnection.
 
 ## Quick start
 
-Requires Node.js 22+.
+Requires Node.js 22+ and a PostgreSQL database (13+). Any hosted service works, such as Neon, Supabase, Render or RDS, as does a local install. The schema is created automatically on first start.
 
 ```bash
 npm install
+export DATABASE_URL='postgres://user:password@host:5432/dbname?sslmode=require'
 npm run dev        # API/WebSocket server on :3000 + Vite dev server on :5173
 ```
 
@@ -26,7 +27,7 @@ npm start          # serves the client, API and WebSockets on :3000
 
 | Script | Purpose |
 | --- | --- |
-| `npm test` | Engine, service (SQLite) and WebSocket integration tests |
+| `npm test` | Engine, service (PostgreSQL) and WebSocket integration tests. Starts a throwaway embedded PostgreSQL automatically; set `TEST_DATABASE_URL` to use your own server instead (the role needs `CREATEDB`) |
 | `npm run typecheck` | TypeScript type check for server, client and tests |
 
 ### Configuration (environment variables)
@@ -35,7 +36,8 @@ npm start          # serves the client, API and WebSockets on :3000
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP/WebSocket port |
 | `HOST` | `0.0.0.0` | Bind address |
-| `DB_PATH` | `data/snakes.db` | SQLite database file (created automatically) |
+| `DATABASE_URL` | (required) | PostgreSQL connection string. Add `?sslmode=require` for most hosted services |
+| `DATABASE_POOL_MAX` | `10` | Maximum database connections held by the server |
 | `RECONNECT_GRACE_MS` | `30000` | How long a disconnected player keeps a lobby seat, or their turn, before being removed or skipped |
 | `START_COUNTDOWN_MS` | `3000` | Countdown between "Start" and the first turn |
 | `HEARTBEAT_MS` | `15000` | WebSocket ping interval used to detect dead connections |
@@ -46,7 +48,7 @@ npm start          # serves the client, API and WebSockets on :3000
 Browser ──intent──▶ WebSocket ──▶ RoomManager ──▶ GameService ──▶ GameEngine (pure rules)
                                                      │
                                                      ▼
-                                   SQLite (one transaction per action)
+                                 PostgreSQL (one transaction per action)
                                                      │
 Browser ◀──state + events── broadcast to room ◀──────┘
 ```
@@ -56,7 +58,7 @@ shared/            Types, constants, board configs and the wire protocol, used b
 server/
   engine/          Pure, deterministic game rules (no I/O) — rollDice, movePlayer, applySnake, …
   game/            GameService (load → engine → persist, transactional) and RoomManager (broadcasts, timers)
-  db/              SQLite connection, migrations and repository (parameterised SQL only)
+  db/              PostgreSQL pool, migrations and repository (parameterised SQL only)
   http/            REST API and static file serving
   ws/              WebSocket endpoint and connection registry
   validation.ts    Central validation of every client input
@@ -91,7 +93,9 @@ The player token is a random secret returned only to the joining player. Only it
 
 ### Database
 
-Tables `games`, `players` and `moves`, managed by append-only migrations in `server/db/migrations.ts` (tracked in `schema_migrations`). Players who leave are soft-deleted (`left_at`), so move history stays intact. Each action is one `IMMEDIATE` transaction.
+Tables `games`, `players` and `moves`, managed by append-only migrations in `server/db/migrations.ts` (tracked in `schema_migrations`). Migrations run at startup under an advisory lock. Players who leave are soft-deleted (`left_at`), so move history stays intact. Each action is one transaction that first locks the game row (`SELECT … FOR UPDATE`), so concurrent actions on a room are applied one at a time. Within a server process, work for each room is also queued so state broadcasts go out in commit order.
+
+The server assumes it is the only instance: on boot it marks every player disconnected, and real-time broadcasts are in-process. Running several instances behind a load balancer would need a shared pub/sub, such as Postgres `LISTEN/NOTIFY`.
 
 ### Disconnections
 
