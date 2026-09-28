@@ -1,0 +1,57 @@
+.dice {
+  width: 76px;
+  height: 76px;
+  flex: none;
+  perspective: 400px;
+}
+.dice-face {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  padding: 13px;
+  gap: 4px;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #ffffff, #f1ece4);
+  border: 1px solid #eadfcd;
+  box-shadow:
+    0 10px 18px -8px rgba(60, 40, 10, 0.45),
+    inset 0 -4px 0 rgba(120, 90, 40, 0.12);
+  animation: dice-land 320ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.dice--rolling .dice-face {
+  animation: dice-tumble 360ms linear infinite;
+}
+.dice--idle .dice-face {
+  opacity: 0.55;
+}
+.pip {
+  align-self: center;
+  justify-self: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #4a4f7a, #1e2142);
+}
+.pip--off {
+  visibility: hidden;
+}
+
+@keyframes dice-tumble {
+  0% { transform: rotate(0deg) translateY(0) scale(1); }
+  25% { transform: rotate(90deg) translateY(-6px) scale(0.94); }
+  50% { transform: rotate(180deg) translateY(0) scale(1); }
+  75% { transform: rotate(270deg) translateY(-6px) scale(0.94); }
+  100% { transform: rotate(360deg) translateY(0) scale(1); }
+}
+@keyframes dice-land {
+  0% { transform: scale(0.8) rotate(-12deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dice-face,
+  .dice--rolling .dice-face {
+    animation: none;
+  }
+}
