@@ -107,3 +107,5 @@ The server assumes it is the only instance: on boot it marks every player discon
 ### Disconnections
 
 A dropped player is marked disconnected and everyone is notified, but their state is kept. They are restored automatically when their tab reconnects, including after a page reload or a browser restart. If a player stays away past the grace period, they lose their lobby seat, or their turns are skipped during a game so the others can keep playing.
+
+
