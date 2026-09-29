@@ -25,7 +25,17 @@ export interface ServerConfig {
   heartbeatMs: number;
 }
 
+/** Loads variables from ./.env if present. Variables already set in the environment win. */
+function loadDotEnv(): void {
+  try {
+    process.loadEnvFile();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+}
+
 export function loadConfig(): ServerConfig {
+  loadDotEnv();
   return {
     port: intFromEnv('PORT', 3000),
     host: process.env.HOST ?? '0.0.0.0',

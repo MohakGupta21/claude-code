@@ -12,9 +12,16 @@ Requires Node.js 22+ and a PostgreSQL database (13+). Any hosted service works, 
 
 ```bash
 npm install
-export DATABASE_URL='postgres://user:password@host:5432/dbname?sslmode=require'
 npm run dev        # API/WebSocket server on :3000 + Vite dev server on :5173
 ```
+
+If `DATABASE_URL` is not set, `npm run dev` starts a local embedded PostgreSQL that stores its data in `data/postgres` (gitignored), so nothing needs to be installed. To use your own database, put its connection string in a `.env` file in the project root (gitignored; loaded automatically by `npm run dev` and `npm start`, and shell variables take precedence):
+
+```bash
+DATABASE_URL=postgres://user:password@host:5432/dbname?sslmode=require
+```
+
+`npm start` (production) always requires `DATABASE_URL`.
 
 Open http://localhost:5173. To try multiplayer on one machine, open a second tab (each tab is its own player) and join with the room code.
 
@@ -36,7 +43,7 @@ npm start          # serves the client, API and WebSockets on :3000
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP/WebSocket port |
 | `HOST` | `0.0.0.0` | Bind address |
-| `DATABASE_URL` | (required) | PostgreSQL connection string. Add `?sslmode=require` for most hosted services |
+| `DATABASE_URL` | (required for `npm start`; `npm run dev` falls back to embedded PostgreSQL) | PostgreSQL connection string. Add `?sslmode=require` for most hosted services |
 | `DATABASE_POOL_MAX` | `10` | Maximum database connections held by the server |
 | `RECONNECT_GRACE_MS` | `30000` | How long a disconnected player keeps a lobby seat, or their turn, before being removed or skipped |
 | `START_COUNTDOWN_MS` | `3000` | Countdown between "Start" and the first turn |
