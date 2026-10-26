@@ -32,7 +32,8 @@ function config(overrides: Partial<ServerConfig> = {}): ServerConfig {
 }
 
 async function start(overrides: Partial<ServerConfig> = {}) {
-  app = await createApp(config(overrides));
+  // A fixed non-6 roll keeps turn order predictable (a 6 would grant an extra turn).
+  app = await createApp(config(overrides), { rollDice: () => 3 });
   await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
 }

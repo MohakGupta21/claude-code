@@ -36,6 +36,8 @@ export type FinishRule = 'exact' | 'bounce' | 'overshoot';
 
 export interface GameRules {
   finishRule: FinishRule;
+  /** Dice value that lets the player roll again (unless they won); null disables extra turns. */
+  extraTurnOn: number | null;
 }
 
-export const DEFAULT_RULES: GameRules = { finishRule: 'exact' };
+export const DEFAULT_RULES: GameRules = { finishRule: 'exact', extraTurnOn: DICE_MAX };

@@ -21,6 +21,9 @@ export function TurnCard({ state, myId, dice, animating, pendingRoll, connection
   const isMyTurn = state.status === GAME_STATUS.PLAYING && state.currentPlayerId === myId;
   const connected = connection === 'open';
   const canRoll = isMyTurn && connected && !animating && !pendingRoll;
+  const bonus = state.lastDiceRoll?.extraTurn && state.lastDiceRoll.playerId === state.currentPlayerId
+    ? state.lastDiceRoll.diceValue
+    : null;
 
   useEffect(() => {
     if (!canRoll) return;
@@ -48,8 +51,11 @@ export function TurnCard({ state, myId, dice, animating, pendingRoll, connection
     title = 'Reconnecting…';
     subtitle = 'Hang tight, restoring your game';
   } else if (isMyTurn) {
-    title = 'Your turn!';
-    subtitle = animating ? 'Moving…' : 'Roll the dice';
+    title = bonus ? `You rolled a ${bonus}!` : 'Your turn!';
+    subtitle = animating ? 'Moving…' : bonus ? 'Roll again' : 'Roll the dice';
+  } else if (bonus && current) {
+    title = `${current.name} rolled a ${bonus}!`;
+    subtitle = `${current.name} gets another roll…`;
   } else {
     title = `${current?.name ?? 'Someone'}'s turn`;
     subtitle = current && !current.isConnected

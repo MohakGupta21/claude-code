@@ -96,6 +96,25 @@ describe('GameService', () => {
     expect(moves[0]).toMatchObject({ dice_value: 3, start_position: 0, end_position: 3, final_position: 3 });
   });
 
+  it('lets a player who rolls a 6 roll again, and persists it', async () => {
+    const { roomCode, host, guest } = await startedTwoPlayerGame();
+    nextRoll = [6];
+    const { state, events } = await service.rollDice(roomCode, host.playerId);
+    expect(state.currentPlayerId).toBe(host.playerId);
+    expect(state.lastDiceRoll).toMatchObject({ diceValue: 6, extraTurn: true });
+    expect(events.map((e) => e.type)).toContain('EXTRA_TURN');
+    expect(await errorCode(() => service.rollDice(roomCode, guest.playerId))).toBe('NOT_YOUR_TURN');
+
+    await db.end();
+    await open();
+    const restored = await service.getState(roomCode);
+    expect(restored).toMatchObject({ currentPlayerId: host.playerId, rules: { extraTurnOn: 6 } });
+    expect(restored.lastDiceRoll).toMatchObject({ extraTurn: true });
+
+    nextRoll = [2];
+    expect((await service.rollDice(roomCode, host.playerId)).state.currentPlayerId).toBe(guest.playerId);
+  });
+
   it('serialises concurrent joins so capacity is never exceeded', async () => {
     const host = await service.createGame('P1');
     const names = Array.from({ length: MAX_PLAYERS + 3 }, (_, i) => `Guest${i}`);

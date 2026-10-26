@@ -10,6 +10,7 @@ interface GameRow {
   status: GameStatus;
   board_id: string;
   finish_rule: FinishRule;
+  extra_turn_on: number | null;
   current_player_id: string | null;
   winner_id: string | null;
   turn_number: number;
@@ -43,6 +44,7 @@ interface MoveRow {
   jump: JumpKind | null;
   blocked: boolean;
   bounced: boolean;
+  extra_turn: boolean;
   created_at: Date;
 }
 
@@ -100,15 +102,16 @@ export class GameRepository {
 
   async insertGame(game: Game): Promise<void> {
     await this.db.query(
-      `INSERT INTO games (id, room_code, status, board_id, finish_rule, current_player_id, winner_id,
-                          turn_number, round, starts_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      `INSERT INTO games (id, room_code, status, board_id, finish_rule, extra_turn_on, current_player_id,
+                          winner_id, turn_number, round, starts_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         game.id,
         game.roomCode,
         game.status,
         game.boardId,
         game.rules.finishRule,
+        game.rules.extraTurnOn,
         game.currentPlayerId,
         game.winnerId,
         game.turnNumber,
@@ -134,7 +137,7 @@ export class GameRepository {
       roomCode: row.room_code,
       status: row.status,
       boardId: row.board_id,
-      rules: { finishRule: row.finish_rule },
+      rules: { finishRule: row.finish_rule, extraTurnOn: row.extra_turn_on },
       currentPlayerId: row.current_player_id,
       winnerId: row.winner_id,
       turnNumber: row.turn_number,
@@ -204,8 +207,8 @@ export class GameRepository {
   async insertMove(gameId: string, round: number, move: MoveResult, createdAt: string): Promise<void> {
     await this.db.query(
       `INSERT INTO moves (game_id, player_id, round, turn_number, dice_value, start_position, end_position,
-                          final_position, jump, blocked, bounced, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                          final_position, jump, blocked, bounced, extra_turn, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         gameId,
         move.playerId,
@@ -218,6 +221,7 @@ export class GameRepository {
         move.jump,
         move.blocked,
         move.bounced,
+        move.extraTurn,
         createdAt,
       ],
     );
@@ -264,6 +268,7 @@ function toMove(row: MoveRow, boardSize: number): MoveLogEntry {
     jump: row.jump,
     blocked: row.blocked,
     bounced: row.bounced,
+    extraTurn: row.extra_turn,
     won: row.final_position === boardSize,
     turnNumber: row.turn_number,
     createdAt: row.created_at.toISOString(),

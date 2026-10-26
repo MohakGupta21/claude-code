@@ -13,7 +13,8 @@ const board: BoardConfig = {
   snakes: { 42: 17, 99: 54 },
   ladders: { 23: 56, 4: 25 },
 };
-const exact = { finishRule: 'exact' } as const;
+const exact = { finishRule: 'exact', extraTurnOn: null } as const;
+const sixRollsAgain = { finishRule: 'exact', extraTurnOn: 6 } as const;
 
 function expectGameError(fn: () => unknown, code: string) {
   try {
@@ -158,6 +159,35 @@ describe('turn management', () => {
     }
     expect(order).toEqual(['a', 'b', 'c', 'a', 'b', 'c', 'a']);
     expect(game.turnNumber).toBe(8);
+  });
+
+  it('gives the same player another turn after rolling a 6', () => {
+    const { game, move, events } = engine.applyRoll(playingGame({ a: 10 }), 'a', 6, board, sixRollsAgain, NOW);
+    expect(move).toMatchObject({ finalPosition: 16, extraTurn: true });
+    expect(game).toMatchObject({ currentPlayerId: 'a', turnNumber: 2 });
+    expect(events).toContainEqual({ type: 'EXTRA_TURN', playerId: 'a', name: 'a', diceValue: 6 });
+    expect(events.at(-1)).toEqual({ type: 'TURN_CHANGED', playerId: 'a', turnNumber: 2 });
+
+    const after = engine.applyRoll(game, 'a', 2, board, sixRollsAgain, NOW);
+    expect(after.move.extraTurn).toBe(false);
+    expect(after.game.currentPlayerId).toBe('b');
+  });
+
+  it('grants an extra turn on a 6 even after a snake or a blocked roll', () => {
+    expect(engine.applyRoll(playingGame({ a: 36 }), 'a', 6, board, sixRollsAgain, NOW).game.currentPlayerId).toBe('a');
+    const blocked = engine.applyRoll(playingGame({ a: 97 }), 'a', 6, board, sixRollsAgain, NOW);
+    expect(blocked.move).toMatchObject({ blocked: true, extraTurn: true });
+    expect(blocked.game.currentPlayerId).toBe('a');
+  });
+
+  it('ends the game instead of granting an extra turn when a 6 wins', () => {
+    const { game, move } = engine.applyRoll(playingGame({ a: 94 }), 'a', 6, board, sixRollsAgain, NOW);
+    expect(move).toMatchObject({ won: true, extraTurn: false });
+    expect(game).toMatchObject({ status: GAME_STATUS.FINISHED, currentPlayerId: null });
+  });
+
+  it('passes the turn on a 6 when extra turns are disabled', () => {
+    expect(engine.applyRoll(playingGame({ a: 10 }), 'a', 6, board, exact, NOW).game.currentPlayerId).toBe('b');
   });
 
   it('computes the next turn by turn order regardless of array order', () => {

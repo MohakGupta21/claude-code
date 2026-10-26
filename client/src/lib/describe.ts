@@ -7,6 +7,11 @@ export const squareLabel = (square: number) => (square === START_POSITION ? 'Sta
 
 /** One-line history entry for a move. */
 export function describeMove(move: MoveResult, name: string, boardSize: number): string {
+  const text = describeStep(move, name, boardSize);
+  return move.extraTurn ? `${text} — rolls again!` : text;
+}
+
+function describeStep(move: MoveResult, name: string, boardSize: number): string {
   if (move.won) return `${name} rolled ${move.diceValue} and reached ${boardSize}!`;
   if (move.blocked) return `${name} rolled ${move.diceValue} but needs exactly ${boardSize - move.startPosition}`;
   const base = `${name} rolled ${move.diceValue}: ${squareLabel(move.startPosition)} → ${move.endPosition}`;

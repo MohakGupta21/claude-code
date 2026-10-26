@@ -29,6 +29,8 @@ export interface MoveResult {
   blocked: boolean;
   /** True when the dice overshot and the token bounced back (bounce rule). */
   bounced: boolean;
+  /** True when the roll earned the same player another roll. */
+  extraTurn: boolean;
   won: boolean;
   turnNumber: number;
 }
@@ -71,6 +73,7 @@ export type GameEvent =
   | { type: 'SNAKE_TRIGGERED'; playerId: string; from: number; to: number }
   | { type: 'LADDER_TRIGGERED'; playerId: string; from: number; to: number }
   | { type: 'TURN_SKIPPED'; playerId: string; name: string }
+  | { type: 'EXTRA_TURN'; playerId: string; name: string; diceValue: number }
   | { type: 'TURN_CHANGED'; playerId: string; turnNumber: number }
   | { type: 'GAME_WON'; playerId: string; name: string }
   | { type: 'GAME_ABANDONED' }

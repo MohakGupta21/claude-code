@@ -49,7 +49,12 @@ export interface StepResult {
 }
 
 /** Moves a token by the dice value, honouring the configured finish rule. */
-export function movePlayer(position: number, diceValue: number, boardSize: number, rules: GameRules): StepResult {
+export function movePlayer(
+  position: number,
+  diceValue: number,
+  boardSize: number,
+  rules: Pick<GameRules, 'finishRule'>,
+): StepResult {
   const target = position + diceValue;
   if (target <= boardSize) return { position: target, blocked: false, bounced: false };
   switch (rules.finishRule) {
@@ -72,6 +77,11 @@ export function applyLadder(position: number, board: BoardConfig): number | null
 
 export function checkWinner(position: number, board: BoardConfig): boolean {
   return position === board.size;
+}
+
+/** Whether a non-winning roll lets the same player roll again. */
+export function earnsExtraTurn(diceValue: number, won: boolean, rules: GameRules): boolean {
+  return !won && rules.extraTurnOn === diceValue;
 }
 
 export interface MoveOutcome {
@@ -267,6 +277,7 @@ export function applyRoll(
   const player = validateMove(game, playerId, diceValue);
   const outcome = computeMove(player.position, diceValue, board, rules);
   const won = checkWinner(outcome.finalPosition, board);
+  const extraTurn = earnsExtraTurn(diceValue, won, rules);
   const move: MoveResult = {
     playerId,
     diceValue,
@@ -276,6 +287,7 @@ export function applyRoll(
     jump: outcome.jump,
     blocked: outcome.blocked,
     bounced: outcome.bounced,
+    extraTurn,
     won,
     turnNumber: game.turnNumber,
   };
@@ -309,8 +321,10 @@ export function applyRoll(
     };
   }
 
-  const next = nextTurn(moved.players, playerId);
+  // Every roll advances turnNumber, so an extra turn is a fresh turn for the same player.
+  const next = extraTurn ? playerId : nextTurn(moved.players, playerId);
   const turnNumber = game.turnNumber + 1;
+  if (extraTurn) events.push({ type: 'EXTRA_TURN', playerId, name: player.name, diceValue });
   if (next) events.push({ type: 'TURN_CHANGED', playerId: next, turnNumber });
   return { move, events, game: { ...moved, currentPlayerId: next, turnNumber } };
 }

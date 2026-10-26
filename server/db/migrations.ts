@@ -80,6 +80,15 @@ export const MIGRATIONS: Migration[] = [
       CREATE INDEX idx_moves_player_id ON moves(player_id);
     `,
   },
+  {
+    version: 2,
+    name: 'extra_turn_rule',
+    sql: `
+      ALTER TABLE games
+        ADD COLUMN extra_turn_on INTEGER DEFAULT ${DICE_MAX} CHECK (extra_turn_on BETWEEN ${DICE_MIN} AND ${DICE_MAX});
+      ALTER TABLE moves ADD COLUMN extra_turn BOOLEAN NOT NULL DEFAULT FALSE;
+    `,
+  },
 ];
 
 /** Applies pending migrations in one transaction. Returns the versions that ran. */
